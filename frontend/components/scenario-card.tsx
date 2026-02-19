@@ -4,9 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { RevealBars } from "@/components/reveal-bars";
 import { VotePanel } from "@/components/vote-panel";
 import {
@@ -19,6 +16,7 @@ import {
   isAdminAddress,
   outcomeFunction,
   OUTCOME_CONFIG,
+  type ScenarioPhase,
   type ScenarioView,
   type UniverseView,
 } from "@/lib/outcome-fi";
@@ -32,6 +30,21 @@ function scenarioResolved(scenario: ScenarioView): boolean {
 function allScenariosResolved(universe: UniverseView | null): boolean {
   if (!universe || universe.scenarios.length === 0) return false;
   return universe.scenarios.every(scenarioResolved);
+}
+
+function PhaseBadge({ phase }: { phase: ScenarioPhase }) {
+  const label = getPhaseLabel(phase);
+  const cls =
+    phase === 0 ? "phase-commit" : phase === 1 ? "phase-reveal" : "phase-resolved";
+  const led =
+    phase === 0 ? "led-dim" : phase === 1 ? "led-amber" : "led-hot";
+
+  return (
+    <span className={`phase-badge ${cls} flex items-center gap-1.5`}>
+      <span className={`led ${led}`} style={{ width: 5, height: 5 }} />
+      {label.toUpperCase()}
+    </span>
+  );
 }
 
 export function ScenarioCard() {
@@ -262,153 +275,383 @@ export function ScenarioCard() {
   }, [activeUniverseId, refreshUniverse]);
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Universe State</CardTitle>
-          <CardDescription>Read and interact with a published universe by chain id.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              value={universeIdInput}
-              onChange={(event) => setUniverseIdInput(event.target.value)}
-              placeholder="Universe id"
-            />
-            <Button variant="outline" onClick={loadUniverseByInput}>
-              Load
-            </Button>
-            <Button variant="outline" onClick={() => refreshUniverse()} disabled={isLoadingUniverse}>
-              Refresh
-            </Button>
+    <div className="space-y-4">
+      {/* ─── UNIVERSE LOADER ─────────────────────── */}
+      <div
+        className="void-card p-4"
+        style={{ background: "linear-gradient(145deg, #060A14 0%, #04070F 100%)" }}
+      >
+        {/* Header row */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span
+              style={{
+                fontFamily: "var(--font-share-tech-mono)",
+                fontSize: "0.65rem",
+                letterSpacing: "0.2em",
+                color: "rgba(0,255,163,0.5)",
+              }}
+            >
+              UNIVERSE_STATE
+            </span>
+          </div>
+          <div
+            style={{
+              fontFamily: "var(--font-share-tech-mono)",
+              fontSize: "0.6rem",
+              letterSpacing: "0.08em",
+              color: "rgba(56,189,248,0.5)",
+            }}
+          >
+            POLL /{POLL_INTERVAL_MS / 1000}s
+          </div>
+        </div>
+
+        {/* Universe ID input */}
+        <div className="flex items-center gap-2">
+          <span
+            style={{
+              fontFamily: "var(--font-share-tech-mono)",
+              fontSize: "0.7rem",
+              color: "rgba(0,255,163,0.5)",
+              letterSpacing: "0.08em",
+            }}
+          >
+            UNIVERSE #
+          </span>
+          <input
+            className="universe-input flex-1"
+            value={universeIdInput}
+            onChange={(e) => setUniverseIdInput(e.target.value)}
+            placeholder="ID"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") loadUniverseByInput();
+            }}
+          />
+          <button className="btn-ghost-neon" onClick={loadUniverseByInput}>
+            LOAD
+          </button>
+          <button
+            className="btn-ghost-neon"
+            onClick={() => refreshUniverse()}
+            disabled={isLoadingUniverse}
+          >
+            {isLoadingUniverse ? "SYNCING..." : "REFRESH"}
+          </button>
+        </div>
+
+        {/* Status messages */}
+        {isLoadingUniverse && !universe && (
+          <div
+            className="mt-4 flex items-center gap-2"
+            style={{
+              fontFamily: "var(--font-share-tech-mono)",
+              fontSize: "0.7rem",
+              color: "rgba(56,189,248,0.7)",
+            }}
+          >
+            <span className="led led-amber" />
+            FETCHING CHAIN STATE...
+          </div>
+        )}
+        {loadError && (
+          <p
+            className="mt-4"
+            style={{
+              fontFamily: "var(--font-share-tech-mono)",
+              fontSize: "0.7rem",
+              color: "#FF2060",
+            }}
+          >
+            ✗ {loadError}
+          </p>
+        )}
+      </div>
+
+      {/* ─── UNIVERSE DATA ────────────────────────── */}
+      {universe && (
+        <div className="space-y-4">
+          {/* Universe header */}
+          <div className="status-panel p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+              <span
+                style={{
+                  fontFamily: "var(--font-share-tech-mono)",
+                  fontSize: "0.65rem",
+                  letterSpacing: "0.15em",
+                  color: "rgba(0,255,163,0.5)",
+                }}
+              >
+                UNIVERSE #{universe.id} ·{" "}
+                {universe.scenarioIds.length} SCENARIOS
+              </span>
+              <span
+                className="flex items-center gap-1.5"
+                style={{
+                  fontFamily: "var(--font-share-tech-mono)",
+                  fontSize: "0.65rem",
+                  letterSpacing: "0.1em",
+                  color:
+                    universe.status === 2
+                      ? "#FF2060"
+                      : universe.status === 1
+                        ? "#F59E0B"
+                        : "#00FFA3",
+                }}
+              >
+                <span
+                  className={`led ${universe.status === 2 ? "led-hot" : universe.status === 1 ? "led-amber" : "led-green"}`}
+                  style={{ width: 5, height: 5 }}
+                />
+                {getUniverseStatusLabel(universe.status).toUpperCase()}
+              </span>
+            </div>
+            <h3
+              style={{
+                fontFamily: "var(--font-barlow-condensed)",
+                fontSize: "1.4rem",
+                fontWeight: 700,
+                fontStyle: "italic",
+                letterSpacing: "0.03em",
+                color: "#DCE8F5",
+                lineHeight: 1.2,
+              }}
+            >
+              {universe.headline}
+            </h3>
           </div>
 
-          {isLoadingUniverse && !universe ? <p className="text-sm text-muted-foreground">Loading...</p> : null}
-          {loadError ? <p className="text-sm text-destructive">{loadError}</p> : null}
+          {/* Scenarios */}
+          {universe.scenarios.map((scenario, scenarioIdx) => {
+            const hasVoted = Boolean(hasVotedByScenario[scenario.id]);
+            const selectedChoice = selectedChoices[scenario.id] ?? null;
+            const isVotingScenario = Boolean(isVoting[scenario.id]);
+            const isAdvancingScenario = Boolean(isAdvancing[scenario.id]);
+            const isResolvingScenario = Boolean(isResolving[scenario.id]);
+            const winnerText =
+              scenario.winningChoice >= 0 && scenario.winningChoice < scenario.choices.length
+                ? scenario.choices[scenario.winningChoice]
+                : "Unknown winner";
 
-          {universe ? (
-            <div className="space-y-4">
-              <div className="rounded-lg border p-4">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Universe #{universe.id}</p>
-                <p className="mt-1 text-lg font-semibold">{universe.headline}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Status: {getUniverseStatusLabel(universe.status)} · {universe.scenarioIds.length} scenarios
-                </p>
-              </div>
-
-              {universe.scenarios.map((scenario) => {
-                const hasVoted = Boolean(hasVotedByScenario[scenario.id]);
-                const selectedChoice = selectedChoices[scenario.id] ?? null;
-                const isVotingScenario = Boolean(isVoting[scenario.id]);
-                const isAdvancingScenario = Boolean(isAdvancing[scenario.id]);
-                const isResolvingScenario = Boolean(isResolving[scenario.id]);
-                const winnerText =
-                  scenario.winningChoice >= 0 && scenario.winningChoice < scenario.choices.length
-                    ? scenario.choices[scenario.winningChoice]
-                    : "Unknown winner";
-
-                return (
-                  <div key={scenario.id} className="rounded-lg border p-4">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Scenario #{scenario.id} · {getPhaseLabel(scenario.phase)}
-                    </p>
-                    <p className="mt-1 font-medium">{scenario.question}</p>
-                    <p className="text-sm text-muted-foreground">{scenario.totalVotes} votes</p>
-
-                    <div className="mt-4 space-y-4">
-                      {scenario.phase === 0 ? (
-                        connected ? (
-                          <VotePanel
-                            choices={scenario.choices}
-                            selectedChoice={selectedChoice}
-                            hasVoted={hasVoted}
-                            isSubmitting={isVotingScenario}
-                            onSelect={(choice) =>
-                              setSelectedChoices((prev) => ({
-                                ...prev,
-                                [scenario.id]: choice,
-                              }))
-                            }
-                            onSubmit={() => handleVote(scenario.id)}
-                          />
-                        ) : (
-                          <p className="text-sm text-muted-foreground">Connect a wallet to vote.</p>
-                        )
-                      ) : (
-                        <RevealBars choices={scenario.choices} counts={scenario.voteCounts} />
-                      )}
-
-                      {scenario.phase === 2 ? (
-                        <p className="text-sm font-medium">Winning option: {winnerText}</p>
-                      ) : null}
-
-                      {isAdmin && scenario.phase === 0 ? (
-                        <Button
-                          className="w-full"
-                          onClick={() => handleAdvancePhase(scenario.id)}
-                          disabled={isAdvancingScenario || isVotingScenario || isResolvingScenario}
-                        >
-                          {isAdvancingScenario ? "Advancing..." : "Advance To Reveal"}
-                        </Button>
-                      ) : null}
-
-                      {isAdmin && scenario.phase === 1 ? (
-                        <Button
-                          className="w-full"
-                          onClick={() => handleResolveScenario(scenario.id)}
-                          disabled={isResolvingScenario || isVotingScenario || isAdvancingScenario}
-                        >
-                          {isResolvingScenario ? "Resolving..." : "Resolve Scenario"}
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
-
-              <div className="space-y-3 rounded-lg border p-4">
-                <div className="flex flex-wrap gap-2">
-                  {isAdmin ? (
-                    <Button
-                      onClick={handleSealUniverse}
-                      disabled={isSealingUniverse || !allScenariosResolved(universe) || universe.status === 2}
-                    >
-                      {isSealingUniverse ? "Generating + Sealing..." : "Seal Universe"}
-                    </Button>
-                  ) : null}
+            return (
+              <div
+                key={scenario.id}
+                className={`scenario-block p-5 ${scenario.phase === 2 ? "scenario-block-resolved" : ""}`}
+                style={{ animationDelay: `${scenarioIdx * 60}ms` }}
+              >
+                {/* Scenario header */}
+                <div className="flex flex-wrap items-center gap-3 mb-3">
+                  <span
+                    style={{
+                      fontFamily: "var(--font-share-tech-mono)",
+                      fontSize: "0.65rem",
+                      letterSpacing: "0.15em",
+                      color: "rgba(90,112,144,0.7)",
+                    }}
+                  >
+                    SCENARIO_{String(scenario.id).padStart(3, "0")}
+                  </span>
+                  <PhaseBadge phase={scenario.phase} />
+                  <span
+                    style={{
+                      fontFamily: "var(--font-share-tech-mono)",
+                      fontSize: "0.65rem",
+                      letterSpacing: "0.06em",
+                      color: "rgba(56,189,248,0.6)",
+                      marginLeft: "auto",
+                    }}
+                  >
+                    {scenario.totalVotes.toLocaleString()} VOTES
+                  </span>
                 </div>
 
-                {narrativeStory ? (
-                  <div className="rounded-md border bg-muted/30 p-4">
-                    <ReactMarkdown
-                      components={{
-                        h1: ({ children }) => <h1 className="text-xl font-semibold">{children}</h1>,
-                        h2: ({ children }) => <h2 className="mt-4 text-lg font-semibold">{children}</h2>,
-                        h3: ({ children }) => <h3 className="mt-3 text-base font-semibold">{children}</h3>,
-                        p: ({ children }) => <p className="mt-2 text-sm leading-6">{children}</p>,
-                        li: ({ children }) => <li className="ml-5 list-disc text-sm leading-6">{children}</li>,
-                      }}
-                    >
-                      {narrativeStory}
-                    </ReactMarkdown>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+                {/* Question */}
+                <p
+                  className="mb-5"
+                  style={{
+                    fontFamily: "var(--font-barlow-condensed)",
+                    fontSize: "1.2rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.02em",
+                    color: "#C8DFF0",
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {scenario.question}
+                </p>
 
-      {lastTxHash ? (
+                {/* Voting / Reveal content */}
+                <div className="space-y-4">
+                  {scenario.phase === 0 ? (
+                    connected ? (
+                      <VotePanel
+                        choices={scenario.choices}
+                        selectedChoice={selectedChoice}
+                        hasVoted={hasVoted}
+                        isSubmitting={isVotingScenario}
+                        onSelect={(choice) =>
+                          setSelectedChoices((prev) => ({
+                            ...prev,
+                            [scenario.id]: choice,
+                          }))
+                        }
+                        onSubmit={() => handleVote(scenario.id)}
+                      />
+                    ) : (
+                      <p
+                        className="flex items-center gap-2 py-2"
+                        style={{
+                          fontFamily: "var(--font-share-tech-mono)",
+                          fontSize: "0.7rem",
+                          letterSpacing: "0.1em",
+                          color: "rgba(56,189,248,0.6)",
+                        }}
+                      >
+                        <span className="led led-dim" />
+                        CONNECT WALLET TO VOTE
+                      </p>
+                    )
+                  ) : (
+                    <RevealBars choices={scenario.choices} counts={scenario.voteCounts} />
+                  )}
+
+                  {/* Winner display */}
+                  {scenario.phase === 2 && (
+                    <div className="flex items-center gap-3 pt-1">
+                      <span className="winner-badge">
+                        <span className="led led-hot" style={{ width: 5, height: 5 }} />
+                        CANONICAL OUTCOME
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "0.85rem",
+                          fontWeight: 600,
+                          color: "#FF2060",
+                          textShadow: "0 0 12px rgba(255,32,96,0.4)",
+                        }}
+                      >
+                        {winnerText}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Admin controls */}
+                  {isAdmin && scenario.phase === 0 && (
+                    <button
+                      className="btn-ghost-neon w-full"
+                      style={{ width: "100%", textAlign: "center" }}
+                      onClick={() => handleAdvancePhase(scenario.id)}
+                      disabled={isAdvancingScenario || isVotingScenario || isResolvingScenario}
+                    >
+                      {isAdvancingScenario ? "ADVANCING..." : "▶ ADVANCE TO REVEAL"}
+                    </button>
+                  )}
+
+                  {isAdmin && scenario.phase === 1 && (
+                    <button
+                      className="btn-ghost-neon w-full"
+                      style={{ width: "100%", textAlign: "center" }}
+                      onClick={() => handleResolveScenario(scenario.id)}
+                      disabled={isResolvingScenario || isVotingScenario || isAdvancingScenario}
+                    >
+                      {isResolvingScenario ? "RESOLVING..." : "▶ RESOLVE SCENARIO"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* ─── SEAL + NARRATIVE ───────────────────── */}
+          <div className="void-card p-5 space-y-5">
+            {/* Admin seal button */}
+            {isAdmin && (
+              <div className="flex items-center gap-3">
+                <button
+                  className="btn-neon"
+                  onClick={handleSealUniverse}
+                  disabled={
+                    isSealingUniverse || !allScenariosResolved(universe) || universe.status === 2
+                  }
+                >
+                  {isSealingUniverse ? "GENERATING + SEALING..." : "⬡ SEAL UNIVERSE"}
+                </button>
+                {universe.status === 2 && (
+                  <span
+                    className="flex items-center gap-1.5"
+                    style={{
+                      fontFamily: "var(--font-share-tech-mono)",
+                      fontSize: "0.65rem",
+                      letterSpacing: "0.1em",
+                      color: "rgba(255,32,96,0.7)",
+                    }}
+                  >
+                    <span className="led led-hot" style={{ width: 5, height: 5 }} />
+                    UNIVERSE SEALED
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Narrative */}
+            {narrativeStory && (
+              <div>
+                <p
+                  className="mb-3 flex items-center gap-2"
+                  style={{
+                    fontFamily: "var(--font-share-tech-mono)",
+                    fontSize: "0.65rem",
+                    letterSpacing: "0.2em",
+                    color: "rgba(0,255,163,0.5)",
+                  }}
+                >
+                  <span className="led led-green" />
+                  CANONICAL_TIMELINE
+                </p>
+                <div className="narrative-terminal terminal-cursor">
+                  <ReactMarkdown
+                    components={{
+                      h1: ({ children }) => <h1>{children}</h1>,
+                      h2: ({ children }) => <h2>{children}</h2>,
+                      h3: ({ children }) => <h3>{children}</h3>,
+                      p: ({ children }) => <p>{children}</p>,
+                      li: ({ children }) => <li>{children}</li>,
+                    }}
+                  >
+                    {narrativeStory}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── LAST TX HASH ─────────────────────────── */}
+      {lastTxHash && (
         <a
           href={explorerTxUrl(lastTxHash, network?.chainId)}
           target="_blank"
           rel="noopener noreferrer"
-          className="block text-sm text-primary underline-offset-2 hover:underline"
+          className="flex items-center gap-2"
+          style={{
+            fontFamily: "var(--font-share-tech-mono)",
+            fontSize: "0.65rem",
+            letterSpacing: "0.08em",
+            color: "rgba(56,189,248,0.7)",
+            textDecoration: "none",
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.color = "rgba(56,189,248,1)")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.color = "rgba(56,189,248,0.7)")
+          }
         >
-          View latest transaction on explorer →
+          <span className="led led-green" style={{ width: 5, height: 5 }} />
+          VIEW TX ON EXPLORER ↗ {lastTxHash.slice(0, 10)}...{lastTxHash.slice(-6)}
         </a>
-      ) : null}
+      )}
     </div>
   );
 }
