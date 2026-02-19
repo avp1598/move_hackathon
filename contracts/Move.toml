@@ -1,0 +1,16 @@
+[package]
+name = "move_hackathon"
+version = "1.0.0"
+authors = []
+
+[addresses]
+move_hackathon = "0x19e8061f2064bfdbfecd2994c013735ec9f6575328047af0dc6cfc2855efbcf6"
+
+[dev-addresses]
+
+[dependencies.AptosFramework]
+git = "https://github.com/movementlabsxyz/aptos-core.git"
+rev = "m1"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dev-dependencies]
