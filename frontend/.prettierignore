@@ -1,0 +1,12 @@
+node_modules
+.next
+.env.local
+.env.development
+.env.production
+dist
+build
+coverage
+*.lock
+package-lock.json
+.claude/
+.taskmaster/
