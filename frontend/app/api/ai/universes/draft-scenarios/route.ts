@@ -4,7 +4,6 @@ import { draftUniverseScenariosWithAgent } from "@/lib/server/ai/universe-agents
 
 const DraftRequestSchema = z.object({
   headline: z.string().min(10).max(240),
-  targetCount: z.number().int().min(3).max(6).default(3),
   tone: z.string().min(3).max(120).optional(),
 });
 
@@ -26,7 +25,6 @@ export async function POST(request: Request) {
     const userAddress = request.headers.get("x-user-address") ?? "anonymous";
     const result = await draftUniverseScenariosWithAgent({
       headline: parsed.data.headline,
-      targetCount: parsed.data.targetCount,
       tone: parsed.data.tone,
       createdBy: userAddress,
     });

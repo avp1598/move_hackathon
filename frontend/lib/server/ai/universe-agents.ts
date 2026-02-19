@@ -13,9 +13,10 @@ import {
 } from "@/lib/server/db/repository";
 import { fetchChainUniverseState } from "@/lib/server/outcome-chain";
 
-const SCENARIO_PROMPT_VERSION = "scenario_planner_v2_structured";
+const SCENARIO_PROMPT_VERSION = "scenario_planner_v3_structured_fixed4";
 const NARRATIVE_PROMPT_VERSION = "narrative_composer_v3_markdown";
 const DEFAULT_MODEL = process.env.OUTCOME_AI_MODEL ?? "moonshotai/kimi-k2.5";
+const FIXED_SCENARIO_COUNT = 4;
 
 const openrouter = createOpenAI({
   name: "openrouter",
@@ -35,7 +36,7 @@ const ScenarioDraftSchema = z.object({
   rationale: z.string().min(8).max(500),
 });
 
-const ScenarioDraftListSchema = z.array(ScenarioDraftSchema).min(3).max(6);
+const ScenarioDraftListSchema = z.array(ScenarioDraftSchema).length(FIXED_SCENARIO_COUNT);
 
 const ScenarioPlanOutputSchema = z.object({
   scenarios: ScenarioDraftListSchema,
@@ -47,27 +48,12 @@ function normalizeText(input: string): string {
   return input.trim().replace(/\s+/g, " ");
 }
 
-function normalizedToken(input: string): string {
-  return normalizeText(input).toLowerCase();
-}
-
-function clampTargetCount(targetCount: number): number {
-  if (!Number.isFinite(targetCount)) return 3;
-  return Math.max(3, Math.min(6, Math.round(targetCount)));
-}
-
 function toScenarioDraftInput(draft: ScenarioDraft): ScenarioDraftInput {
   return {
     question: normalizeText(draft.question),
     options: draft.options.map((option) => normalizeText(option)),
     rationale: normalizeText(draft.rationale),
   };
-}
-
-function splitKeywords(headline: string): string[] {
-  return normalizedToken(headline)
-    .split(/[^a-z0-9]+/g)
-    .filter((token) => token.length >= 4);
 }
 
 function errorMessage(error: unknown): string {
@@ -81,51 +67,6 @@ function requireAiProviderKey(): void {
   if (!hasAiProviderKey()) {
     throw new Error("OPENROUTER_API_KEY is required. AI routes run in strict AI-only mode.");
   }
-}
-
-function validateScenarioDraftsLocally(drafts: ScenarioDraftInput[], headline: string): {
-  valid: boolean;
-  errors: string[];
-  normalizedDrafts: ScenarioDraftInput[];
-} {
-  const errors: string[] = [];
-  const normalizedDrafts = drafts.map((draft) => ({
-    question: normalizeText(draft.question),
-    options: draft.options.map((option) => normalizeText(option)),
-    rationale: normalizeText(draft.rationale ?? ""),
-  }));
-
-  const seenQuestions = new Set<string>();
-  const keywords = splitKeywords(headline);
-
-  normalizedDrafts.forEach((draft, index) => {
-    const questionKey = normalizedToken(draft.question);
-    if (seenQuestions.has(questionKey)) {
-      errors.push(`Scenario ${index + 1} duplicates another scenario question.`);
-    }
-    seenQuestions.add(questionKey);
-
-    if (draft.options.length !== 4) {
-      errors.push(`Scenario ${index + 1} must contain exactly 4 options.`);
-      return;
-    }
-
-    const uniqueOptions = new Set(draft.options.map((option) => normalizedToken(option)));
-    if (uniqueOptions.size !== 4) {
-      errors.push(`Scenario ${index + 1} has duplicate or tautological options.`);
-    }
-
-    const joined = normalizedToken(`${draft.question} ${draft.options.join(" ")}`);
-    if (keywords.length > 0 && !keywords.some((keyword) => joined.includes(keyword))) {
-      errors.push(`Scenario ${index + 1} is weakly connected to the headline.`);
-    }
-  });
-
-  return {
-    valid: errors.length === 0,
-    errors,
-    normalizedDrafts,
-  };
 }
 
 function computeStoryHash(story: string): string {
@@ -168,12 +109,10 @@ async function collectResolvedScenariosForNarrative(
 
 export async function draftUniverseScenariosWithAgent({
   headline,
-  targetCount,
   createdBy,
   tone,
 }: {
   headline: string;
-  targetCount: number;
   createdBy: string;
   tone?: string;
 }): Promise<{
@@ -187,7 +126,6 @@ export async function draftUniverseScenariosWithAgent({
   };
 }> {
   requireAiProviderKey();
-  const clampedTargetCount = clampTargetCount(targetCount);
   const universe = createUniverseDraft({
     headline: normalizeText(headline),
     createdBy: normalizeText(createdBy),
@@ -206,7 +144,7 @@ export async function draftUniverseScenariosWithAgent({
         schema: ScenarioPlanOutputSchema,
         schemaName: "ScenarioPlanOutput",
         schemaDescription:
-          "An object with scenarios: exactly 3-6 distinct scenario drafts, each containing one question, exactly four mutually-exclusive options, and a rationale.",
+          "An object with scenarios: exactly 4 distinct scenario drafts, each containing one question, exactly four mutually-exclusive options, and a rationale.",
         temperature: 0.2,
         system: [
           "You are ScenarioPlannerAgent for outcome.fi Universe mode.",
@@ -216,9 +154,9 @@ export async function draftUniverseScenariosWithAgent({
         ].join(" "),
         prompt: [
           `headline: ${universe.headline}`,
-          `target_count_exact: ${clampedTargetCount}`,
+          `target_count_exact: ${FIXED_SCENARIO_COUNT}`,
           tone ? `tone/style constraints: ${normalizeText(tone)}` : "",
-          "Return exactly target_count_exact scenarios.",
+          `Return exactly ${FIXED_SCENARIO_COUNT} scenarios.`,
           attempt > 1
             ? `Retry context: previous attempt failed validation -> ${attemptErrors[attemptErrors.length - 1]}`
             : "",
@@ -228,21 +166,7 @@ export async function draftUniverseScenariosWithAgent({
           .join("\n"),
       });
 
-      const candidateDrafts = result.object.scenarios.map(toScenarioDraftInput);
-      const validation = validateScenarioDraftsLocally(candidateDrafts, universe.headline);
-      if (!validation.valid) {
-        attemptErrors.push(`attempt ${attempt}: ${validation.errors.join("; ")}`);
-        continue;
-      }
-
-      if (validation.normalizedDrafts.length < clampedTargetCount) {
-        attemptErrors.push(
-          `attempt ${attempt}: returned ${validation.normalizedDrafts.length} scenarios, expected at least ${clampedTargetCount}`
-        );
-        continue;
-      }
-
-      drafts = validation.normalizedDrafts.slice(0, clampedTargetCount);
+      drafts = result.object.scenarios.map(toScenarioDraftInput);
       break;
     } catch (error) {
       attemptErrors.push(`attempt ${attempt}: ${errorMessage(error)}`);
@@ -261,7 +185,7 @@ export async function draftUniverseScenariosWithAgent({
     agentName: "ScenarioPlannerAgent",
     input: {
       headline: universe.headline,
-      targetCount: clampedTargetCount,
+      targetCount: FIXED_SCENARIO_COUNT,
       tone: tone ?? null,
     },
     output: {
