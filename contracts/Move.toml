@@ -4,7 +4,7 @@ version = "1.0.0"
 authors = []
 
 [addresses]
-move_hackathon = "0x19e8061f2064bfdbfecd2994c013735ec9f6575328047af0dc6cfc2855efbcf6"
+move_hackathon = "0xdd525d357675655d18cecf68c3a7f29de3cda46ba4e4d0065ac9debdb8982575"
 
 [dev-addresses]
 

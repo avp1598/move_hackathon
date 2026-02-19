@@ -97,8 +97,8 @@ If chain read fails, show setup/error state with scenario address and retry.
 `frontend/.env.local`:
 
 ```bash
-NEXT_PUBLIC_OUTCOME_MODULE_ADDRESS=0x19e8061f2064bfdbfecd2994c013735ec9f6575328047af0dc6cfc2855efbcf6
-NEXT_PUBLIC_SCENARIO_ADDRESS=0x19e8061f2064bfdbfecd2994c013735ec9f6575328047af0dc6cfc2855efbcf6
+NEXT_PUBLIC_OUTCOME_MODULE_ADDRESS=0xdd525d357675655d18cecf68c3a7f29de3cda46ba4e4d0065ac9debdb8982575
+NEXT_PUBLIC_SCENARIO_ADDRESS=0xdd525d357675655d18cecf68c3a7f29de3cda46ba4e4d0065ac9debdb8982575
 NEXT_PUBLIC_MODULE_NAME=outcome_fi
 ```
 
@@ -134,14 +134,14 @@ NEXT_PUBLIC_MODULE_NAME=outcome_fi
 
 ```bash
 cd contracts
-movement move publish --named-addresses move_hackathon=0x19e8061f2064bfdbfecd2994c013735ec9f6575328047af0dc6cfc2855efbcf6
+movement move publish --named-addresses move_hackathon=0xdd525d357675655d18cecf68c3a7f29de3cda46ba4e4d0065ac9debdb8982575
 ```
 
 ### Initialize Scenario
 
 ```bash
 movement move run \
-  --function-id 0x19e8061f2064bfdbfecd2994c013735ec9f6575328047af0dc6cfc2855efbcf6::outcome_fi::initialize \
+  --function-id 0xdd525d357675655d18cecf68c3a7f29de3cda46ba4e4d0065ac9debdb8982575::outcome_fi::initialize \
   --args \
     string:"What if Ethereum was never created?" \
     string:"Bitcoin becomes the only smart contract platform" \
@@ -154,16 +154,16 @@ movement move run \
 
 ```bash
 movement move run \
-  --function-id 0x19e8061f2064bfdbfecd2994c013735ec9f6575328047af0dc6cfc2855efbcf6::outcome_fi::advance_phase \
-  --args address:0x19e8061f2064bfdbfecd2994c013735ec9f6575328047af0dc6cfc2855efbcf6
+  --function-id 0xdd525d357675655d18cecf68c3a7f29de3cda46ba4e4d0065ac9debdb8982575::outcome_fi::advance_phase \
+  --args address:0xdd525d357675655d18cecf68c3a7f29de3cda46ba4e4d0065ac9debdb8982575
 ```
 
 ### Resolve Timeline (Admin)
 
 ```bash
 movement move run \
-  --function-id 0x19e8061f2064bfdbfecd2994c013735ec9f6575328047af0dc6cfc2855efbcf6::outcome_fi::resolve \
-  --args address:0x19e8061f2064bfdbfecd2994c013735ec9f6575328047af0dc6cfc2855efbcf6
+  --function-id 0xdd525d357675655d18cecf68c3a7f29de3cda46ba4e4d0065ac9debdb8982575::outcome_fi::resolve \
+  --args address:0xdd525d357675655d18cecf68c3a7f29de3cda46ba4e4d0065ac9debdb8982575
 ```
 
 ---

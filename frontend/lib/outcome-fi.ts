@@ -23,19 +23,19 @@ const MOVEMENT_NETWORKS: Record<"mainnet" | "testnet", MovementNetworkConfig> = 
   mainnet: {
     chainId: 126,
     label: "Movement Mainnet",
-    fullnode: "https://full.mainnet.movementinfra.xyz/v1",
+    fullnode: "https://mainnet.movementnetwork.xyz/v1",
     explorerNetwork: "mainnet",
   },
   testnet: {
     chainId: 250,
     label: "Movement Testnet",
-    fullnode: "https://full.testnet.movementinfra.xyz/v1",
+    fullnode: "https://testnet.movementnetwork.xyz/v1",
     explorerNetwork: "testnet",
   },
 };
 
 const DEFAULT_MODULE_ADDRESS =
-  "0x19e8061f2064bfdbfecd2994c013735ec9f6575328047af0dc6cfc2855efbcf6";
+  "0xdd525d357675655d18cecf68c3a7f29de3cda46ba4e4d0065ac9debdb8982575";
 
 export const OUTCOME_CONFIG = {
   moduleAddress: process.env.NEXT_PUBLIC_OUTCOME_MODULE_ADDRESS ?? DEFAULT_MODULE_ADDRESS,

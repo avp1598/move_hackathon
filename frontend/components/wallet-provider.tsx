@@ -2,23 +2,25 @@
 
 import { ReactNode } from "react";
 import { AptosWalletAdapterProvider } from "@aptos-labs/wallet-adapter-react";
-import { AptosConfig, Network } from "@aptos-labs/ts-sdk";
+import { Network } from "@aptos-labs/ts-sdk";
 
 interface WalletProviderProps {
   children: ReactNode;
 }
 
 export function WalletProvider({ children }: WalletProviderProps) {
-  // Default to Movement testnet for hackathon flow.
-  const aptosConfig = new AptosConfig({
-    network: Network.CUSTOM,
-    fullnode: "https://full.testnet.movementinfra.xyz/v1",
-  });
+  // Wallet adapter plugins currently reject CUSTOM networks during init.
+  // Use Aptos TESTNET for wallet-adapter bootstrapping; app tx queries still
+  // use Movement endpoints elsewhere.
+  const dappConfig = {
+    network: Network.TESTNET,
+  };
   
   return (
     <AptosWalletAdapterProvider
+      optInWallets={["Nightly"]}
       autoConnect={true}
-      dappConfig={aptosConfig}
+      dappConfig={dappConfig}
       onError={(error) => {
         console.error("Wallet error:", JSON.stringify(error, null, 2));
       }}
